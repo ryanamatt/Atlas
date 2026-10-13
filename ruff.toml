@@ -1,0 +1,51 @@
+# ruff.toml
+
+target-version = "py311"
+line-length = 100
+src = ["."]
+
+[lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort (import ordering)
+    "N",    # pep8-naming
+    "D",    # pydocstyle (docstrings)
+    "D213", # Docstring summary starts on the second line (off by default in Google).
+    "ANN",  # flake8-annotations (type annotations)
+    "UP",   # pyupgrade (modern syntax)
+    "B",    # flake8-bugbear (likely bugs)
+    "A",    # flake8-builtins (shadowed builtins)
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "PTH",  # flake8-use-pathlib
+    "RET",  # flake8-return
+    "TC",   # flake8-type-checking
+    "S",    # flake8-bandit (security)
+    "PL",   # Pylint
+    "RUF",  # Ruff-specific rules
+]
+ignore = [
+    "D212",     # Conflicts with D213 (summary on the first line).
+    "PLR2004",  # Magic values in comparisons are often fine in a CLI tool.
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.isort]
+known-first-party = ["atlas"]
+
+[lint.per-file-ignores]
+"atlas/vault.py" = [
+    "W293",     # Blank line contains whitespace in template string.
+]
+"atlas/errors.py" = [
+    "D107"
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true

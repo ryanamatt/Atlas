@@ -1,0 +1,20 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas"
+version = "0.1.0"
+description = "A command-line tool for managing and validating Markdown-based worldbuilding vaults."
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0"
+]
+
+[project.scripts]
+atlas = "atlas.main:main"
+
+[tool.setuptools.packages.find]
+include = ["atlas*"]
