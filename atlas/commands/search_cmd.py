@@ -8,6 +8,7 @@ from atlas.commands._types import SubParsers
 from atlas.note import Note
 from atlas.vault import Vault
 
+
 def register(subparsers: SubParsers) -> None:
     """
     Registers the ``search`` command.
@@ -35,14 +36,14 @@ def register(subparsers: SubParsers) -> None:
 def _matches_title(note: Note, query: str) -> bool:
     """
     Checks whether a note's title contains the query.
- 
+
     The comparison is case-insensitive, and only the title (the file name
     without its suffix) is searched, not the folders above it.
- 
+
     Args:
         note: The note to check.
         query: The text to look for.
- 
+
     Returns:
         True if the title contains the query.
     """
@@ -52,16 +53,16 @@ def _matches_title(note: Note, query: str) -> bool:
 def run(args: argparse.Namespace) -> int:
     """
     Runs the ``search`` command.
- 
+
     Prints the vault-relative path of every note whose title contains the
     query, one per line, sorted by path. Printing nothing is not an error.
- 
+
     Args:
         args: The parsed command-line arguments.
- 
+
     Returns:
         The process exit code. Zero indicates success.
- 
+
     Raises:
         VaultNotFoundError: If the vault path does not exist.
         VaultNotInitializedError: If the vault has no ``.atlas`` directory.
@@ -83,4 +84,3 @@ def run(args: argparse.Namespace) -> int:
         print(path)
 
     return 0
-

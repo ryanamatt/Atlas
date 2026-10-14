@@ -3,13 +3,18 @@
 """The ``Note`` object, which represents a Markdown note in a vault."""
 
 from __future__ import annotations
+
 import shutil
 from datetime import datetime
 from pathlib import Path
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 from atlas import frontmatter
 from atlas.errors import (
+    DirectoryReadError,
     FileCreationError,
     FileDeletionError,
     FileReadError,
@@ -18,7 +23,6 @@ from atlas.errors import (
     InvalidNoteNameError,
     NoteExistsError,
     NoteNotFoundError,
-    DirectoryReadError,
 )
 from atlas.vault import ATLAS_DIRNAME, Vault
 
@@ -51,7 +55,7 @@ class Note:
         self.path: Path = path
 
     @classmethod
-    def from_name(cls, vault: Vault, name: str) -> "Note":
+    def from_name(cls, vault: Vault, name: str) -> Note:
         """
         Builds a note from a user-supplied name.
 
@@ -116,22 +120,23 @@ class Note:
     def iter_notes(vault: Vault, include_hidden: bool = False) -> Iterator[Note]:
         """
         Walks the vault and yields every Markdown note in it.
-    
+
         Symbolic links to directories are not followed, which keeps the search
         inside the vault. Hidden directories, such as ``.atlas`` and ``.trash``,
         are skipped unless ``include_hidden`` is set. Hidden files are skipped
         the same way.
-    
+
         Args:
             vault: The vault to walk.
             include_hidden: Whether to include hidden files and directories.
-    
+
         Yields:
             Each note found, in no particular order.
-    
+
         Raises:
             DirectoryReadError: If a directory cannot be read.
         """
+
         def on_error(error: OSError) -> None:
             raise DirectoryReadError(Path(error.filename or vault.root), error.strerror)
 
@@ -265,7 +270,7 @@ class Note:
             reason = getattr(error, "strerror", None) or str(error)
             raise FileDeletionError(self.path, reason) from error
 
-    def move(self, destination: "Note") -> None:
+    def move(self, destination: Note) -> None:
         """
         Moves or renames the note to a new destination note path.
 

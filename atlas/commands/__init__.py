@@ -19,4 +19,3 @@ def register_all(subparsers: SubParsers) -> None:
     delete_cmd.register(subparsers)
     move_cmd.register(subparsers)
     search_cmd.register(subparsers)
-
