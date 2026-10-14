@@ -22,3 +22,22 @@ class SubParsers(Protocol):
     ) -> argparse.ArgumentParser:
         """Adds a named subparser and returns it."""
         ...
+
+
+def non_empty(value: str) -> str:
+    """
+    Strips a command-line value and rejects it if nothing is left.
+
+    Args:
+        value: The raw value from the command line.
+
+    Returns:
+        The stripped value.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is empty or only whitespace.
+    """
+    stripped: str = value.strip()
+    if not stripped:
+        raise argparse.ArgumentTypeError("must not be empty")
+    return stripped

@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterator, Mapping
+    from typing import Any
 
 from atlas import frontmatter, wikilinks
 from atlas.errors import (
@@ -366,15 +367,18 @@ class Vault:
         except OSError as error:
             raise FileWriteError(path, error.strerror) from error
 
-    def create(self, note: Note) -> None:
+    def create(self, note: Note, properties: Mapping[str, Any] | None = None) -> None:
         """
         Creates the note file, along with any missing parent folders.
 
-        The note starts with YAML frontmatter holding its id, followed by a
-        top-level heading taken from its title.
+        The note starts with YAML frontmatter holding its id, then any extra
+        properties in the order given, followed by a top-level heading taken
+        from its title.
 
         Args:
             note: The note to create.
+            properties: Extra frontmatter to write after the id, such as
+                ``{"type": "Nation"}``. The id always comes from the note's path.
 
         Raises:
             NoteExistsError: If the note already exists.
@@ -382,6 +386,8 @@ class Vault:
                 created.
         """
         path: Path = self.path_of(note)
+        data: dict[str, Any] = {"id": note.note_id}
+        data.update({key: value for key, value in (properties or {}).items() if key != "id"})
 
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -390,7 +396,7 @@ class Vault:
 
         try:
             with path.open("x", encoding="utf-8") as file:
-                file.write(frontmatter.join({"id": note.note_id}, f"# {note.title}\n"))
+                file.write(frontmatter.join(data, f"# {note.title}\n"))
         except FileExistsError as error:
             raise NoteExistsError(note.path) from error
         except OSError as error:
