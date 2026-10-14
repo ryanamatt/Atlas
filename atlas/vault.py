@@ -5,14 +5,15 @@
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
-from atlas import frontmatter
+from atlas import frontmatter, wikilinks
 from atlas.errors import (
     DirectoryReadError,
     FileCreationError,
@@ -39,6 +40,20 @@ schema_version = 1
 """
 
 MAX_PARENT_SEARCH: int = 5
+
+
+@dataclass(frozen=True)
+class MoveResult:
+    """
+    What a move changed besides the note itself.
+
+    Attributes:
+        links_updated: How many wiki links were rewritten.
+        notes_updated: How many notes had at least one link rewritten.
+    """
+
+    links_updated: int = 0
+    notes_updated: int = 0
 
 
 class Vault:
@@ -412,28 +427,39 @@ class Vault:
             reason = getattr(error, "strerror", None) or str(error)
             raise FileDeletionError(self.path_of(note), reason) from error
 
-    def move(self, source: Note, destination: Note) -> None:
+    def move(self, source: Note, destination: Note, update_links: bool = True) -> MoveResult:
         """
         Moves or renames a note to a new destination.
 
         Creates any missing parent directories for the destination. If the
         note has an ``id`` in its frontmatter, the id is rewritten to match the
-        new path. A note without an ``id`` is moved unchanged. The note is read
-        before anything moves, so an unreadable note or broken frontmatter
-        stops the command with nothing changed.
+        new path. A note without an ``id`` is moved unchanged.
+
+        Unless ``update_links`` is False, wiki links to the note are rewritten
+        in every visible note of the vault, including the moved note itself.
+        A link written as a full path gets the new path. A link written as a
+        bare title is only changed when the title changes, or when the bare
+        title would no longer point at one note. A bare title that several
+        notes share is left alone, because it is unclear which note it meant.
 
         Args:
             source: The note to move.
             destination: The note at the new path.
+            update_links: Whether to rewrite wiki links that point at the note.
+
+        Returns:
+            How many links and notes were updated.
 
         Raises:
             NoteNotFoundError: If the source note does not exist.
             NoteExistsError: If a note already exists at the destination.
-            FileReadError: If the note cannot be read.
-            InvalidFrontmatterError: If the note's frontmatter is not valid.
+            FileReadError: If a note that must be read cannot be read.
+            InvalidFrontmatterError: If the moved note's frontmatter is not
+                valid.
             FileCreationError: If parent folders cannot be created.
             FileDeletionError: If the note cannot be moved.
-            FileWriteError: If the new id cannot be written after the move.
+            FileWriteError: If a note cannot be written after the move.
+            DirectoryReadError: If a directory in the vault cannot be read.
         """
         if not self.note_exists(source):
             raise NoteNotFoundError(source.path)
@@ -441,7 +467,24 @@ class Vault:
         if self.note_exists(destination):
             raise NoteExistsError(destination.path)
 
-        updated_text: str | None = source.text_with_id(self.read_note(source), destination.note_id)
+        original_text: str = self.read_note(source)
+        text: str = source.text_with_id(original_text, destination.note_id) or original_text
+
+        self_links: int = 0
+        other_updates: list[tuple[Note, str]] = []
+        other_links: int = 0
+
+        if update_links:
+            others: list[Note] = [note for note in self.iter_notes() if note != source]
+            replace = _link_replacer(source, destination, others)
+
+            text, self_links = wikilinks.rewrite(text, replace)
+            for other in others:
+                other_text: str = self.read_note(other)
+                rewritten, count = wikilinks.rewrite(other_text, replace)
+                if count:
+                    other_updates.append((other, rewritten))
+                    other_links += count
 
         source_path: Path = self.path_of(source)
         destination_path: Path = self.path_of(destination)
@@ -457,5 +500,74 @@ class Vault:
             reason = getattr(error, "strerror", None) or str(error)
             raise FileDeletionError(source_path, reason) from error
 
-        if updated_text is not None:
-            self.write_note(destination, updated_text)
+        if text != original_text:
+            self.write_note(destination, text)
+
+        for done, (other, rewritten) in enumerate(other_updates):
+            try:
+                self.write_note(other, rewritten)
+            except FileWriteError as error:
+                raise FileWriteError(
+                    error.path,
+                    f"{error.reason or 'write failed'} "
+                    f"({done} of {len(other_updates)} linking notes were updated first)",
+                ) from error
+
+        return MoveResult(
+            links_updated=self_links + other_links,
+            notes_updated=len(other_updates) + (1 if self_links else 0),
+        )
+
+
+def _link_replacer(
+    source: Note, destination: Note, others: list[Note]
+) -> Callable[[str], str | None]:
+    """
+    Builds the function that decides what each wiki link becomes in a move.
+
+    Matching ignores case and an optional ``.md`` on the link target.
+
+    Args:
+        source: The note being moved.
+        destination: The note at its new path.
+        others: Every other note in the vault, used to detect shared titles.
+
+    Returns:
+        A function from a link target to its new target, or None when the
+        link should stay as it is.
+    """
+    old_path: str = source.path.with_suffix("").as_posix().casefold()
+    old_title: str = source.title.casefold()
+    new_path: str = destination.path.with_suffix("").as_posix()
+
+    old_title_shared: bool = any(note.title.casefold() == old_title for note in others)
+    new_title_shared: bool = any(
+        note.title.casefold() == destination.title.casefold() for note in others
+    )
+    source_at_root: bool = source.path.parent == Path()
+    destination_at_root: bool = destination.path.parent == Path()
+
+    def replace(target: str) -> str | None:
+        has_suffix: bool = Note.is_note_name(target)
+        bare: str = target[: -len(MARKDOWN_SUFFIX)] if has_suffix else target
+        key: str = bare.casefold()
+
+        if "/" in bare:
+            if key != old_path:
+                return None
+            new_target: str = new_path
+        else:
+            if key != old_title:
+                return None
+            # A bare name is an exact path at the root, so it is only unclear
+            # when the note lives in a folder and another note shares its title.
+            if old_title_shared and not source_at_root:
+                return None
+            title_is_unique: bool = not new_title_shared or destination_at_root
+            if destination.title == source.title and title_is_unique:
+                return None
+            new_target = destination.title if title_is_unique else new_path
+
+        return new_target + (MARKDOWN_SUFFIX if has_suffix else "")
+
+    return replace
