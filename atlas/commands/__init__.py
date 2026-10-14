@@ -2,7 +2,7 @@
 
 """Atlas subcommands."""
 
-from atlas.commands import create_cmd, delete_cmd, init_cmd, list_cmd, move_cmd
+from atlas.commands import create_cmd, delete_cmd, init_cmd, list_cmd, move_cmd, search_cmd
 from atlas.commands._types import SubParsers
 
 
@@ -18,3 +18,5 @@ def register_all(subparsers: SubParsers) -> None:
     list_cmd.register(subparsers)
     delete_cmd.register(subparsers)
     move_cmd.register(subparsers)
+    search_cmd.register(subparsers)
+
