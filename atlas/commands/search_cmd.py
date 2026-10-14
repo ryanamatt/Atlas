@@ -3,11 +3,8 @@
 """The atlas ``search`` command."""
 
 import argparse
-from collections.abc import Iterator
-from pathlib import Path
 
 from atlas.commands._types import SubParsers
-from atlas.errors import DirectoryReadError
 from atlas.note import Note
 from atlas.vault import Vault
 
@@ -34,37 +31,6 @@ def register(subparsers: SubParsers) -> None:
     )
     parser.set_defaults(handler=run)
 
-def _iter_notes(vault: Vault, include_hidden: bool = False) -> Iterator[Note]:
-    """
-    Walks the vault and yields every Markdown note in it.
- 
-    Symbolic links to directories are not followed, which keeps the search
-    inside the vault. Hidden directories, such as ``.atlas`` and ``.trash``,
-    are skipped unless ``include_hidden`` is set. Hidden files are skipped
-    the same way.
- 
-    Args:
-        vault: The vault to walk.
-        include_hidden: Whether to include hidden files and directories.
- 
-    Yields:
-        Each note found, in no particular order.
- 
-    Raises:
-        DirectoryReadError: If a directory cannot be read.
-    """
-    def on_error(error: OSError) -> None:
-        raise DirectoryReadError(Path(error.filename or vault.root), error.strerror)
-
-    for directory, dirnames, filenames in Path(vault.root).walk(on_error=on_error):
-        if not include_hidden:
-            dirnames[:] = [name for name in dirnames if not name.startswith(".")]
-
-        for filename in filenames:
-            if not include_hidden and filename.startswith("."):
-                continue
-            if Note.is_note_name(filename):
-                yield Note(vault, Path(directory) / filename)
 
 def _matches_title(note: Note, query: str) -> bool:
     """
@@ -107,7 +73,7 @@ def run(args: argparse.Namespace) -> int:
     results: list[str] = sorted(
         (
             note.relative_path.as_posix()
-            for note in _iter_notes(vault, include_hidden=args.all)
+            for note in Note.iter_notes(vault, include_hidden=args.all)
             if _matches_title(note, query)
         ),
         key=lambda path: (path.casefold(), path),
