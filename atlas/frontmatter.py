@@ -5,7 +5,7 @@
 import re
 import sys
 import unicodedata
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -63,14 +63,16 @@ def split(text: str) -> tuple[dict[str, Any], str]:
         return {}, text
 
     try:
-        data: object = yaml.safe_load(match["yaml"])
+        raw_data: Any = yaml.safe_load(match["yaml"])
     except yaml.YAMLError as error:
         raise InvalidFrontmatterError(str(error)) from error
 
-    if data is None:
-        data = {}
-    if not isinstance(data, dict):
+    if raw_data is None:
+        data: dict[Any, Any] = {}
+    elif not isinstance(raw_data, dict):
         raise InvalidFrontmatterError("frontmatter must be a mapping of keys to values")
+    else:
+        data = cast(dict[Any, Any], raw_data)
 
     body: str = text[match.end() :]
     body = body.removeprefix("\r\n") if body.startswith("\r\n") else body.removeprefix("\n")
