@@ -73,8 +73,8 @@ def run(args: argparse.Namespace) -> int:
 
     results: list[str] = sorted(
         (
-            note.relative_path.as_posix()
-            for note in Note.iter_notes(vault, include_hidden=args.all)
+            note.path.as_posix()
+            for note in vault.iter_notes(include_hidden=args.all)
             if _matches_title(note, query)
         ),
         key=lambda path: (path.casefold(), path),

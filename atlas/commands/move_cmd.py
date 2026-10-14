@@ -3,9 +3,12 @@
 """The ``atlas move`` command."""
 
 import argparse
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from atlas.note import Note
 
 from atlas.commands._types import SubParsers
-from atlas.note import Note
 from atlas.vault import Vault
 
 
@@ -55,8 +58,8 @@ def run(args: argparse.Namespace) -> int:
         FileWriteError: If the note's new id cannot be written after the move.
     """
     vault: Vault = Vault.open(args.vault)
-    source_note: Note = Note.from_name(vault, args.source)
-    dest_note: Note = Note.from_name(vault, args.destination)
+    source_note: Note = vault.resolve_note(args.source)
+    dest_note: Note = vault.resolve_note(args.destination)
 
-    source_note.move(dest_note)
+    vault.move(source_note, dest_note)
     return 0

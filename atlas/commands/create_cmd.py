@@ -5,7 +5,6 @@
 import argparse
 
 from atlas.commands._types import SubParsers
-from atlas.note import Note
 from atlas.vault import Vault
 
 
@@ -48,5 +47,5 @@ def run(args: argparse.Namespace) -> int:
         FileCreationError: If the note or its parent folders cannot be created.
     """
     vault: Vault = Vault.open(args.vault)
-    Note.from_name(vault, args.name).create()
+    vault.create(vault.resolve_note(args.name))
     return 0

@@ -5,7 +5,6 @@
 import argparse
 
 from atlas.commands._types import SubParsers
-from atlas.note import Note
 from atlas.vault import Vault
 
 
@@ -49,5 +48,5 @@ def run(args: argparse.Namespace) -> int:
         FileDeletionError: If the note cannot be moved to the trash.
     """
     vault: Vault = Vault.open(args.vault)
-    Note.from_name(vault, args.name).delete()
+    vault.delete(vault.resolve_note(args.name))
     return 0
