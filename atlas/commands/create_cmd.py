@@ -3,10 +3,13 @@
 """The ``atlas create`` command."""
 
 import argparse
+from typing import TYPE_CHECKING
 
 from atlas.commands._types import SubParsers
 from atlas.vault import Vault
 
+if TYPE_CHECKING:
+    from atlas.note import Note
 
 def register(subparsers: SubParsers) -> None:
     """
@@ -47,5 +50,9 @@ def run(args: argparse.Namespace) -> int:
         FileCreationError: If the note or its parent folders cannot be created.
     """
     vault: Vault = Vault.open(args.vault)
-    vault.create(vault.resolve_note(args.name))
+    new_note: Note = vault.resolve_note(args.name)
+    vault.create(new_note)
+
+    if not args.quiet:
+        print("Created Note:", new_note.path)
     return 0
