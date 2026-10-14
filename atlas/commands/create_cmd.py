@@ -5,7 +5,7 @@
 import argparse
 from typing import TYPE_CHECKING
 
-from atlas.commands._types import SubParsers
+from atlas.commands._types import SubParsers, non_empty
 from atlas.vault import Vault
 
 if TYPE_CHECKING:
@@ -21,6 +21,7 @@ def register(subparsers: SubParsers) -> None:
     parser: argparse.ArgumentParser = subparsers.add_parser(
         "create", help="Create a new Atlas Object."
     )
+
     parser.add_argument(
         "name",
         type=str,
@@ -29,6 +30,14 @@ def register(subparsers: SubParsers) -> None:
             "'Nations/Republic of Valora'. The '.md' extension is optional."
         ),
     )
+
+    parser.add_argument(
+        "--type",
+        type=non_empty,
+        metavar="TYPE",
+        help="Set the type of the new note, e.g. 'Nation'. Written to its frontmatter.",
+    )
+
     parser.set_defaults(handler=run)
 
 
@@ -51,7 +60,12 @@ def run(args: argparse.Namespace) -> int:
     """
     vault: Vault = Vault.open(args.vault)
     new_note: Note = vault.resolve_note(args.name)
-    vault.create(new_note)
+    
+    properties: dict[str, str] = {}
+    if args.type is not None:
+        properties["type"] = args.type.lower()
+
+    vault.create(new_note, properties)
 
     if not args.quiet:
         print("Created Note:", new_note.path)
