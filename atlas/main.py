@@ -38,9 +38,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "-v", "--vault", type=Path, help="Path to the Markdown worldbuilding vault."
     )
 
-    parser.add_argument(
-        "--quiet", action="store_true", help="Silence any messages from Atlas."
-    )
+    parser.add_argument("--quiet", action="store_true", help="Silence any messages from Atlas.")
 
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available Commands")
     register_all(subparsers)
