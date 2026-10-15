@@ -205,3 +205,31 @@ class InvalidFrontmatterError(AtlasError):
         self.path: Path | None = path
         location: str = f" in {path}" if path else ""
         super().__init__(f"Invalid frontmatter{location}: {reason}")
+
+
+class InvalidTemplateNameError(AtlasError):
+    """
+    Raised when a template name cannot be used to look up a template.
+
+    Attributes:
+        name: The name as the user typed it.
+        reason: A short explanation of why the name was rejected.
+    """
+
+    def __init__(self, name: str, reason: str) -> None:
+        self.name: str = name
+        self.reason: str = reason
+        super().__init__(f"Invalid template name {name!r}: {reason}")
+
+
+class TemplateNotFoundError(AtlasError):
+    """
+    Raised when a template cannot be found.
+
+    Attributes:
+        path: The path of the missing template, relative to the vault root.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path: Path = path
+        super().__init__(f"Template does not exist: {path}")

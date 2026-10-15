@@ -14,16 +14,19 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping
     from typing import Any
 
-from atlas import frontmatter, wikilinks
+from atlas import frontmatter, templates, wikilinks
 from atlas.errors import (
     DirectoryReadError,
     FileCreationError,
     FileDeletionError,
     FileReadError,
     FileWriteError,
+    InvalidFrontmatterError,
     InvalidNoteNameError,
+    InvalidTemplateNameError,
     NoteExistsError,
     NoteNotFoundError,
+    TemplateNotFoundError,
     VaultAlreadyInitializedError,
     VaultNotFoundError,
     VaultNotInitializedError,
@@ -33,6 +36,7 @@ from atlas.note import MARKDOWN_SUFFIX, Note
 ATLAS_DIRNAME: str = ".atlas"
 CONFIG_FILENAME: str = "config.toml"
 TRASH_DIRNAME: str = ".trash"
+TEMPLATE_DIRNAME: str = "templates"
 
 DEFAULT_CONFIG: str = """\
 # Atlas vault configuration.
@@ -153,6 +157,11 @@ class Vault:
         """The path of the trash directory. It may not exist yet."""
         return self.root / TRASH_DIRNAME
 
+    @property
+    def templates_dir(self) -> Path:
+        """The path of the templates directory. It may not exist yet."""
+        return self.atlas_dir / TEMPLATE_DIRNAME
+
     def is_initialized(self) -> bool:
         """
         Checks whether the vault has an ``.atlas`` directory.
@@ -217,6 +226,59 @@ class Vault:
         except OSError as error:
             raise FileCreationError(self.trash_dir, error.strerror) from error
         return self.trash_dir
+
+    def read_template(self, name: str) -> tuple[dict[str, Any], str]:
+        """
+        Reads and parses a template by name from the templates directory.
+
+        The name is matched case-insensitively, and an optional ``.md`` suffix
+        is ignored, so ``Nation``, ``nation`` and ``Nation.md`` are the same.
+
+        Args:
+            name: The template name, such as ``Nation``.
+
+        Returns:
+            The template's frontmatter and its body.
+
+        Raises:
+            InvalidTemplateNameError: If the name is empty or contains a path
+                separator or ``..``.
+            TemplateNotFoundError: If the template file does not exist.
+            FileReadError: If the file cannot be read.
+            InvalidFrontmatterError: If the frontmatter is malformed.
+        """
+        bare: str = name[: -len(MARKDOWN_SUFFIX)] if Note.is_note_name(name) else name
+        if not bare.strip() or "/" in bare or "\\" in bare or ".." in bare:
+            raise InvalidTemplateNameError(name, "must not be empty or contain '/', '\\', or '..'")
+
+        target: str = f"{bare}{MARKDOWN_SUFFIX}".casefold()
+        template_path: Path | None = next(
+            (
+                candidate
+                for candidate in self.templates_dir.glob(f"*{MARKDOWN_SUFFIX}")
+                if candidate.name.casefold() == target and candidate.is_file()
+            ),
+            None,
+        )
+        if template_path is None:
+            raise TemplateNotFoundError(
+                Path(ATLAS_DIRNAME, TEMPLATE_DIRNAME, f"{bare}{MARKDOWN_SUFFIX}")
+            )
+
+        try:
+            text: str = template_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason: str = getattr(error, "strerror", None) or str(error)
+            raise FileReadError(template_path, reason) from error
+
+        try:
+            data, body = frontmatter.split(text)
+        except InvalidFrontmatterError as error:
+            raise InvalidFrontmatterError(
+                error.reason, template_path.relative_to(self.root)
+            ) from error
+
+        return data, body
 
     # ------------------------------------------------------------------
     # Notes
@@ -367,27 +429,53 @@ class Vault:
         except OSError as error:
             raise FileWriteError(path, error.strerror) from error
 
-    def create(self, note: Note, properties: Mapping[str, Any] | None = None) -> None:
+    def create(
+        self,
+        note: Note,
+        properties: Mapping[str, Any] | None = None,
+        template: str | None = None,
+    ) -> None:
         """
         Creates the note file, along with any missing parent folders.
 
-        The note starts with YAML frontmatter holding its id, then any extra
-        properties in the order given, followed by a top-level heading taken
-        from its title.
+        Without a template, the note starts with YAML frontmatter holding its id,
+        then any extra properties, followed by a top-level heading taken from its
+        title. With a template, the template's frontmatter and body are used
+        instead of the heading, with ``{{title}}``, ``{{id}}`` and ``{{date}}``
+        filled in. The id always comes from the note's path, and ``properties``
+        override the template's frontmatter.
 
         Args:
             note: The note to create.
-            properties: Extra frontmatter to write after the id, such as
-                ``{"type": "Nation"}``. The id always comes from the note's path.
+            properties: Extra frontmatter to write, such as ``{"type": "nation"}``.
+            template: The name of a template in the vault's templates directory,
+                without the ``.md`` suffix.
 
         Raises:
+            InvalidTemplateNameError: If the template name is not valid.
+            TemplateNotFoundError: If the template does not exist.
+            FileReadError: If the template cannot be read.
+            InvalidFrontmatterError: If the template's frontmatter is not valid.
             NoteExistsError: If the note already exists.
             FileCreationError: If the note or its parent folders cannot be
                 created.
         """
         path: Path = self.path_of(note)
         data: dict[str, Any] = {"id": note.note_id}
-        data.update({key: value for key, value in (properties or {}).items() if key != "id"})
+        body: str = f"# {note.title}\n"
+
+        if template is not None:
+            template_data, template_body = self.read_template(template)
+            values: dict[str, str] = {
+                "title": note.title,
+                "id": note.note_id,
+                "date": datetime.now().strftime("%Y-%m-%d"),
+            }
+            rendered: dict[str, Any] = templates.render_data(template_data, values)
+            data.update((key, value) for key, value in rendered.items() if key != "id")
+            body = templates.render(template_body, values)
+
+        data.update((key, value) for key, value in (properties or {}).items() if key != "id")
 
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -396,7 +484,7 @@ class Vault:
 
         try:
             with path.open("x", encoding="utf-8") as file:
-                file.write(frontmatter.join(data, f"# {note.title}\n"))
+                file.write(frontmatter.join(data, body))
         except FileExistsError as error:
             raise NoteExistsError(note.path) from error
         except OSError as error:

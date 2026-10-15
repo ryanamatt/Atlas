@@ -72,7 +72,7 @@ def split(text: str) -> tuple[dict[str, Any], str]:
     elif not isinstance(raw_data, dict):
         raise InvalidFrontmatterError("frontmatter must be a mapping of keys to values")
     else:
-        data = cast(dict[Any, Any], raw_data)
+        data = cast("dict[Any, Any]", raw_data)
 
     body: str = text[match.end() :]
     body = body.removeprefix("\r\n") if body.startswith("\r\n") else body.removeprefix("\n")
