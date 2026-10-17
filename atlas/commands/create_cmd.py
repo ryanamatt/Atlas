@@ -24,10 +24,11 @@ def register(subparsers: SubParsers) -> None:
     )
 
     parser.add_argument(
-        "name",
+        "names",
+        nargs="+",
         type=str,
         help=(
-            "Path of the new item relative to the vault root, e.g. "
+            "Path(s) of the new item(s) relative to the vault root, e.g. "
             "'Nations/Republic of Valora'. The '.md' extension is optional."
         ),
     )
@@ -72,14 +73,15 @@ def run(args: argparse.Namespace) -> int:
         FileCreationError: If the note or its parent folders cannot be created.
     """
     vault: Vault = Vault.open(args.vault)
-    new_note: Note = vault.resolve_note(args.name)
 
     properties: dict[str, str] = {}
     if args.type is not None:
         properties["type"] = args.type.lower()
 
-    vault.create(new_note, properties=properties, template=args.template)
+    for name in args.names:
+        new_note: Note = vault.resolve_note(name)
+        vault.create(new_note, properties=properties, template=args.template)
 
-    if not args.quiet:
-        print("Created Note:", new_note.path)
+        if not args.quiet:
+            print("Created Note:", new_note.path)
     return 0
