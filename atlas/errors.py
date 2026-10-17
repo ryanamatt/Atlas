@@ -233,6 +233,21 @@ class InvalidFrontmatterError(AtlasError):
         super().__init__(f"Invalid frontmatter{location}: {reason}")
 
 
+class InvalidPropertyError(AtlasError):
+    """
+    Raised when a ``KEY=VALUE`` frontmatter property cannot be understood.
+
+    Attributes:
+        assignment: The property as the user typed it.
+        reason: A short explanation of why it was rejected.
+    """
+
+    def __init__(self, assignment: str, reason: str) -> None:
+        self.assignment: str = assignment
+        self.reason: str = reason
+        super().__init__(f"Invalid property {assignment!r}: {reason}")
+
+
 class InvalidTemplateNameError(AtlasError):
     """
     Raised when a template name cannot be used to look up a template.
