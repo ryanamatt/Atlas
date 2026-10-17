@@ -330,6 +330,32 @@ class Vault:
 
         return Note(note_path.relative_to(self.root))
 
+    def resolve_folder(self, name: str) -> Path | None:
+        """
+        Finds an existing folder in the vault from a user-supplied name.
+
+        A trailing separator is allowed. Folders outside the vault or inside the
+        ``.atlas`` directory are not found.
+
+        Args:
+            name: The name given on the command line, relative to the vault root.
+
+        Returns:
+            The folder path relative to the vault root (``.`` for the root
+            itself), or None if the name is not an existing folder in the vault.
+        """
+        cleaned: str = name.strip().rstrip("/\\")
+        if not cleaned:
+            return None
+
+        path: Path = (self.root / cleaned).resolve()
+        if not path.is_dir() or not path.is_relative_to(self.root):
+            return None
+        if path.is_relative_to(self.atlas_dir):
+            return None
+
+        return path.relative_to(self.root)
+
     def path_of(self, note: Note) -> Path:
         """
         Gives the absolute path of a note file in this vault.

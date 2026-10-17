@@ -155,6 +155,32 @@ class DirectoryReadError(AtlasError):
         super().__init__(message)
 
 
+class NotAFolderError(AtlasError):
+    """
+    Raised when several notes are moved to a destination that is not a directory.
+
+    Attributes:
+        name: The destination as the user typed it.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name: str = name
+        super().__init__(f"Target is not an existing directory: {name!r}")
+
+
+class DuplicateDestinationError(AtlasError):
+    """
+    Raised when two moved notes would end up at the same path.
+
+    Attributes:
+        path: The path that more than one note would take.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path: Path = path
+        super().__init__(f"More than one note would be moved to: {path}")
+
+
 class FileReadError(AtlasError):
     """
     Raised when a file cannot be read.
