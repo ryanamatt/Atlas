@@ -19,10 +19,11 @@ def register(subparsers: SubParsers) -> None:
         "delete", help="Delete an Atlas Object."
     )
     parser.add_argument(
-        "name",
+        "names",
+        nargs="+",
         type=str,
         help=(
-            "Path of the item relative to the vault root, e.g. "
+            "Path(s) of the item(s) relative to the vault root, e.g. "
             "'Nations/Republic of Valora'. The '.md' extension is optional."
         ),
     )
@@ -48,5 +49,7 @@ def run(args: argparse.Namespace) -> int:
         FileDeletionError: If the note cannot be moved to the trash.
     """
     vault: Vault = Vault.open(args.vault)
-    vault.delete(vault.resolve_note(args.name))
+
+    for name in args.names:
+        vault.delete(vault.resolve_note(name))
     return 0
