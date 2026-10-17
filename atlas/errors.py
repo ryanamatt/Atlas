@@ -247,6 +247,7 @@ class InvalidNoteIdError(AtlasError):
         self.reason: str = reason
         super().__init__(f"Invalid note id {note_id!r}: {reason}")
 
+
 class InvalidPropertyError(AtlasError):
     """
     Raised when a ``KEY=VALUE`` frontmatter property cannot be understood.

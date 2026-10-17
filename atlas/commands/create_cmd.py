@@ -3,11 +3,10 @@
 """The ``atlas create`` command."""
 
 import argparse
-
-from typing import TYPE_CHECKING, Any
 import os
 import shlex
 import subprocess
+from typing import TYPE_CHECKING, Any
 
 from atlas import frontmatter
 from atlas.commands._types import SubParsers, non_empty
@@ -69,7 +68,7 @@ def register(subparsers: SubParsers) -> None:
         help=(
             "Use this ID instead of the one derived from the note's path. "
             "Only valid when creating a single note."
-        )
+        ),
     )
 
     parser.add_argument(
@@ -124,7 +123,7 @@ def run(args: argparse.Namespace) -> int:
     for assignment in raw_properties:
         key, value = frontmatter.parse_property(assignment)
         properties[key] = value
-    
+
     last_note: Note | None = None
 
     for name in args.names:
