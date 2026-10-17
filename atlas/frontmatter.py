@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import yaml
 
-from atlas.errors import InvalidFrontmatterError
+from atlas.errors import InvalidFrontmatterError, InvalidPropertyError
 
 FENCE: str = "---"
 
@@ -104,3 +104,40 @@ def join(data: dict[str, Any], body: str) -> str:
         width=sys.maxsize,
     )
     return f"{FENCE}\n{block}{FENCE}\n\n{body}"
+
+
+def parse_property(assignment: str) -> tuple[str, Any]:
+    """
+    Parses a ``KEY=VALUE`` property given on the command line.
+
+    The text is split at the first ``=``. The key is stripped of surrounding
+    whitespace. The value is parsed as YAML, so ``2000000`` becomes an int,
+    ``true`` a bool, ``[a, b]`` a list, and ``draft`` stays a string. Quote the
+    value inside the argument to force a string, as in ``name="'123'"``. An
+    empty value becomes ``None``.
+
+    Args:
+        assignment: The raw ``KEY=VALUE`` text.
+
+    Returns:
+        The key and the parsed value.
+
+    Raises:
+        InvalidPropertyError: If there is no ``=``, the key is empty or is
+            ``id``, or the value is not valid YAML.
+    """
+    key, separator, raw_value = assignment.partition("=")
+    key = key.strip()
+    if not separator or not key:
+        raise InvalidPropertyError(assignment, "expected KEY=VALUE")
+    if key == "id":
+        raise InvalidPropertyError(assignment, "'id' is set from the note path")
+
+    try:
+        value: Any = yaml.safe_load(raw_value)
+    except yaml.YAMLError as error:
+        problem: str = getattr(error, "problem", None) or "invalid YAML"
+        raise InvalidPropertyError(
+            assignment, f"value is not valid YAML ({problem}), quote it to use it as text"
+        ) from error
+    return key, value
