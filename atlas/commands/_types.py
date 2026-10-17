@@ -3,7 +3,9 @@
 """Shared typing helpers for Atlas subcommands."""
 
 import argparse
-from typing import Protocol
+from typing import Any, Protocol
+
+import yaml
 
 
 class SubParsers(Protocol):
@@ -41,3 +43,40 @@ def non_empty(value: str) -> str:
     if not stripped:
         raise argparse.ArgumentTypeError("must not be empty")
     return stripped
+
+
+def key_value(value: str) -> tuple[str, Any]:
+    """
+    Parses a ``KEY=VALUE`` command-line argument.
+
+    The text is split at the first ``=``. The key is stripped of surrounding
+    whitespace. The value is parsed as YAML, so ``2000000`` becomes an int,
+    ``true`` a bool, ``[a, b]`` a list, and ``draft`` stays a string. Quote
+    the value inside the argument to force a string, as in ``name="'123'"``.
+    An empty value becomes ``None``.
+
+    Args:
+        value: The raw ``KEY=VALUE`` argument.
+
+    Returns:
+        The key and the parsed value.
+
+    Raises:
+        argparse.ArgumentTypeError: If there is no ``=``, the key is empty
+            or is ``id``, or the value is not valid YAML.
+    """
+    key, separator, raw_value = value.partition("=")
+    key = key.strip()
+    if not separator or not key:
+        raise argparse.ArgumentTypeError(f"expected KEY=VALUE, got {value!r}")
+    if key == "id":
+        raise argparse.ArgumentTypeError("'id' is set from the note path and cannot be changed")
+
+    try:
+        parsed: Any = yaml.safe_load(raw_value)
+    except yaml.YAMLError as error:
+        problem: str = getattr(error, "problem", None) or "invalid YAML"
+        raise argparse.ArgumentTypeError(
+            f"value for {key!r} is not valid YAML ({problem}); quote it to use it as text"
+        ) from error
+    return key, parsed

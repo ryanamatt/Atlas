@@ -3,11 +3,13 @@
 """The ``atlas create`` command."""
 
 import argparse
+
+from typing import TYPE_CHECKING, Any
 import os
 import shlex
 import subprocess
-from typing import TYPE_CHECKING
 
+from atlas import frontmatter
 from atlas.commands._types import SubParsers, non_empty
 from atlas.errors import InvalidNoteIdError
 from atlas.vault import Vault
@@ -41,7 +43,22 @@ def register(subparsers: SubParsers) -> None:
         "--type",
         type=non_empty,
         metavar="TYPE",
-        help="Set the type of the new note, e.g. 'Nation'. Written to its frontmatter.",
+        help=(
+            "Set the type of the new note, e.g. 'Nation'. Written to its frontmatter. "
+            "Shorthand for --set type=<lowercased TYPE>."
+        ),
+    )
+
+    parser.add_argument(
+        "--set",
+        dest="properties",
+        action="append",
+        metavar="KEY=VALUE",
+        help=(
+            "Set a frontmatter property, e.g. --set status=draft. The value is parsed "
+            "as YAML, so numbers, booleans and lists work: --set population=2000000 "
+            "--set 'tags=[nation, active]'. Repeatable. Overrides --type and the template."
+        ),
     )
 
     parser.add_argument(
@@ -85,6 +102,7 @@ def run(args: argparse.Namespace) -> int:
     Raises:
         VaultNotFoundError: If the vault path does not exist.
         VaultNotInitializedError: If the vault has no ``.atlas`` directory.
+        InvalidPropertyError: If a ``--set`` property is not valid.
         InvalidNoteNameError: If the note name is not valid.
         InvalidTemplateNameError: If the template name is not valid.
         TemplateNotFoundError: If the template does not exist.
@@ -98,10 +116,15 @@ def run(args: argparse.Namespace) -> int:
     if args.note_id is not None and len(args.names) > 1:
         raise InvalidNoteIdError(args.note_id, "--id can only be used when creating one note")
 
-    properties: dict[str, str] = {}
+    properties: dict[str, Any] = {}
     if args.type is not None:
         properties["type"] = args.type.lower()
 
+    raw_properties: list[str] = args.properties or []
+    for assignment in raw_properties:
+        key, value = frontmatter.parse_property(assignment)
+        properties[key] = value
+    
     last_note: Note | None = None
 
     for name in args.names:

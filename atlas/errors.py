@@ -247,6 +247,20 @@ class InvalidNoteIdError(AtlasError):
         self.reason: str = reason
         super().__init__(f"Invalid note id {note_id!r}: {reason}")
 
+class InvalidPropertyError(AtlasError):
+    """
+    Raised when a ``KEY=VALUE`` frontmatter property cannot be understood.
+
+    Attributes:
+        assignment: The property as the user typed it.
+        reason: A short explanation of why it was rejected.
+    """
+
+    def __init__(self, assignment: str, reason: str) -> None:
+        self.assignment: str = assignment
+        self.reason: str = reason
+        super().__init__(f"Invalid property {assignment!r}: {reason}")
+
 
 class InvalidTemplateNameError(AtlasError):
     """
