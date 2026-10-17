@@ -155,7 +155,7 @@ class DirectoryReadError(AtlasError):
         super().__init__(message)
 
 
-class NotADirectoryError(AtlasError):
+class NotAFolderError(AtlasError):
     """
     Raised when several notes are moved to a destination that is not a directory.
 

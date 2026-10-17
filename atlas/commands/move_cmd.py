@@ -3,10 +3,19 @@
 """The ``atlas move`` command."""
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from atlas.commands._types import SubParsers
-from atlas.errors import DuplicateDestinationError, NoteExistsError, NoteNotFoundError, NotADirectoryError
+from atlas.errors import (
+    DuplicateDestinationError,
+    NotAFolderError,
+    NoteExistsError,
+    NoteNotFoundError,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 from atlas.note import Note
 from atlas.vault import MoveResult, Vault
 
@@ -45,9 +54,7 @@ def register(subparsers: SubParsers) -> None:
     parser.set_defaults(handler=run)
 
 
-def _plan_moves(
-    vault: Vault, sources: list[str], destination: str
-) -> list[tuple[Note, Note]]:
+def _plan_moves(vault: Vault, sources: list[str], destination: str) -> list[tuple[Note, Note]]:
     """
     Works out where every source note will go, and checks all of it up front.
 
@@ -64,7 +71,7 @@ def _plan_moves(
 
     Raises:
         InvalidNoteNameError: If a name is not valid.
-        NotADirectoryError: If there are several sources and the destination is
+        NotAFolderError: If there are several sources and the destination is
             not an existing folder.
         NoteNotFoundError: If a source note does not exist.
         NoteExistsError: If a destination note already exists.
@@ -79,7 +86,7 @@ def _plan_moves(
     elif len(source_notes) == 1:
         pairs = [(source_notes[0], vault.resolve_note(destination))]
     else:
-        raise NotADirectoryError(destination)
+        raise NotAFolderError(destination)
 
     seen: set[Path] = set()
     for source, target in pairs:
@@ -108,7 +115,7 @@ def run(args: argparse.Namespace) -> int:
         VaultNotFoundError: If the vault path does not exist.
         VaultNotInitializedError: If the vault has no ``.atlas`` directory.
         InvalidNoteNameError: If a note name is not valid.
-        NotADirectoryError: If there are several sources and the destination is
+        NotAFolderError: If there are several sources and the destination is
             not an existing folder.
         NoteNotFoundError: If a source note does not exist.
         NoteExistsError: If a destination note already exists.
