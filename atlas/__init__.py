@@ -11,7 +11,7 @@ Attributes:
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__: str = version("atlas")
+    __version__: str = version("atlas-vault")
 except PackageNotFoundError:
     __version__: str = "0.1.0-dev"
 

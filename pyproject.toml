@@ -1,17 +1,29 @@
-# pyproject.toml
-
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "atlas"
+name = "atlas-vault"            # see the name note below
 version = "0.1.0"
 description = "A command-line tool for managing and validating Markdown-based worldbuilding vaults."
+readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "pyyaml>=6.0"
+license = "MIT"                 # SPDX expression; pick your own license
+license-files = ["LICENSE"]
+authors = [{ name = "Ryan Mattson", email = "ramattson5@gmail.com" }]
+keywords = ["worldbuilding", "markdown", "cli", "vault"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Topic :: Text Processing :: Markup :: Markdown",
 ]
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/you/atlas"
+Issues = "https://github.com/you/atlas/issues"
 
 [project.scripts]
 atlas = "atlas.main:main"
