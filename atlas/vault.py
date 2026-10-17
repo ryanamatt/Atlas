@@ -460,6 +460,7 @@ class Vault:
         note: Note,
         properties: Mapping[str, Any] | None = None,
         template: str | None = None,
+        note_id: str | None = None,
     ) -> None:
         """
         Creates the note file, along with any missing parent folders.
@@ -468,33 +469,30 @@ class Vault:
         then any extra properties, followed by a top-level heading taken from its
         title. With a template, the template's frontmatter and body are used
         instead of the heading, with ``{{title}}``, ``{{id}}`` and ``{{date}}``
-        filled in. The id always comes from the note's path, and ``properties``
-        override the template's frontmatter.
+        filled in. The id comes from the note's path unless ``note_id`` is given,
+        and ``properties`` override the template's frontmatter.
 
         Args:
             note: The note to create.
             properties: Extra frontmatter to write, such as ``{"type": "nation"}``.
             template: The name of a template in the vault's templates directory,
                 without the ``.md`` suffix.
+            note_id: An id to use instead of the one derived from the note's
+                path. It is also what ``{{id}}`` becomes in a template.
 
         Raises:
-            InvalidTemplateNameError: If the template name is not valid.
-            TemplateNotFoundError: If the template does not exist.
-            FileReadError: If the template cannot be read.
-            InvalidFrontmatterError: If the template's frontmatter is not valid.
-            NoteExistsError: If the note already exists.
-            FileCreationError: If the note or its parent folders cannot be
-                created.
+            ...
         """
         path: Path = self.path_of(note)
-        data: dict[str, Any] = {"id": note.note_id}
+        resolved_id: str = note_id if note_id is not None else note.note_id
+        data: dict[str, Any] = {"id": resolved_id}
         body: str = f"# {note.title}\n"
 
         if template is not None:
             template_data, template_body = self.read_template(template)
             values: dict[str, str] = {
                 "title": note.title,
-                "id": note.note_id,
+                "id": resolved_id,
                 "date": datetime.now().strftime("%Y-%m-%d"),
             }
             rendered: dict[str, Any] = templates.render_data(template_data, values)
