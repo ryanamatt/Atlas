@@ -4,6 +4,9 @@
 
 import argparse
 from typing import TYPE_CHECKING
+import os
+import shlex
+import subprocess
 
 from atlas.commands._types import SubParsers, non_empty
 from atlas.vault import Vault
@@ -48,6 +51,12 @@ def register(subparsers: SubParsers) -> None:
         help="Name of a template in .atlas/templates to start the note from.",
     )
 
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="Open the note (or last note) in the users $EDITOR. Does not open if no $EDITOR."
+    )
+
     parser.set_defaults(handler=run)
 
 
@@ -78,10 +87,24 @@ def run(args: argparse.Namespace) -> int:
     if args.type is not None:
         properties["type"] = args.type.lower()
 
+    last_note: Note | None = None
+
     for name in args.names:
         new_note: Note = vault.resolve_note(name)
         vault.create(new_note, properties=properties, template=args.template)
+        last_note = new_note
 
         if not args.quiet:
             print("Created Note:", new_note.path)
+
+    if args.open and last_note is not None:
+        editor: str | None = os.environ.get('EDITOR', None)
+        if editor:
+            try:
+                cmd = shlex.split(editor) + [str(last_note.path)]
+                subprocess.call(cmd)
+            except FileNotFoundError:
+                print(f"Editor '{editor}' not found.")
+                return 0
+
     return 0
