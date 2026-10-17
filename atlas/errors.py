@@ -233,6 +233,21 @@ class InvalidFrontmatterError(AtlasError):
         super().__init__(f"Invalid frontmatter{location}: {reason}")
 
 
+class InvalidNoteIdError(AtlasError):
+    """
+    Raised when a custom note id cannot be used.
+
+    Attributes:
+        note_id: The id as the user typed it.
+        reason: A short explanation of why the id was rejected.
+    """
+
+    def __init__(self, note_id: str, reason: str) -> None:
+        self.note_id: str = note_id
+        self.reason: str = reason
+        super().__init__(f"Invalid note id {note_id!r}: {reason}")
+
+
 class InvalidPropertyError(AtlasError):
     """
     Raised when a ``KEY=VALUE`` frontmatter property cannot be understood.

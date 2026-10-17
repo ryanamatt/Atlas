@@ -3,14 +3,14 @@
 """The ``atlas create`` command."""
 
 import argparse
-
-from typing import TYPE_CHECKING, Any
 import os
 import shlex
 import subprocess
+from typing import TYPE_CHECKING, Any
 
 from atlas import frontmatter
 from atlas.commands._types import SubParsers, non_empty
+from atlas.errors import InvalidNoteIdError
 from atlas.vault import Vault
 
 if TYPE_CHECKING:
@@ -61,6 +61,17 @@ def register(subparsers: SubParsers) -> None:
     )
 
     parser.add_argument(
+        "--id",
+        type=non_empty,
+        metavar="ID",
+        dest="note_id",
+        help=(
+            "Use this ID instead of the one derived from the note's path. "
+            "Only valid when creating a single note."
+        ),
+    )
+
+    parser.add_argument(
         "-t",
         "--template",
         type=non_empty,
@@ -101,6 +112,9 @@ def run(args: argparse.Namespace) -> int:
     """
     vault: Vault = Vault.open(args.vault)
 
+    if args.note_id is not None and len(args.names) > 1:
+        raise InvalidNoteIdError(args.note_id, "--id can only be used when creating one note")
+
     properties: dict[str, Any] = {}
     if args.type is not None:
         properties["type"] = args.type.lower()
@@ -109,12 +123,12 @@ def run(args: argparse.Namespace) -> int:
     for assignment in raw_properties:
         key, value = frontmatter.parse_property(assignment)
         properties[key] = value
-    
+
     last_note: Note | None = None
 
     for name in args.names:
         new_note: Note = vault.resolve_note(name)
-        vault.create(new_note, properties=properties, template=args.template)
+        vault.create(new_note, properties=properties, template=args.template, note_id=args.note_id)
         last_note = new_note
 
         if not args.quiet:
