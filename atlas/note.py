@@ -67,13 +67,20 @@ class Note:
         """
         Builds note text with its frontmatter id set to a new value.
 
+        Only a default id is rewritten. If the note's ``id`` is not the one
+        derived from its current path, it was set by hand (for example with
+        ``atlas create --id``), so it is kept as it is. Call this on the note
+        as it is before the move, because the current path is what decides
+        whether the id is a default one.
+
         Args:
             text: The current full text of the note.
             new_id: The id to write.
 
         Returns:
             The updated text, or None if the note has no ``id`` in its
-            frontmatter or already has this one, so nothing needs rewriting.
+            frontmatter, has a custom ``id``, or already has ``new_id``, so
+            nothing needs rewriting.
 
         Raises:
             InvalidFrontmatterError: If the note's frontmatter is not valid.
@@ -83,7 +90,8 @@ class Note:
         except InvalidFrontmatterError as error:
             raise InvalidFrontmatterError(error.reason, self.path) from error
 
-        if "id" not in data or data["id"] == new_id:
+        current_id: object = data.get("id")
+        if current_id != self.note_id or current_id == new_id:
             return None
 
         data["id"] = new_id

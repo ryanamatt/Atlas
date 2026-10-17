@@ -550,8 +550,9 @@ class Vault:
         Moves or renames a note to a new destination.
 
         Creates any missing parent directories for the destination. If the
-        note has an ``id`` in its frontmatter, the id is rewritten to match the
-        new path. A note without an ``id`` is moved unchanged.
+        note has a default ``id`` in its frontmatter, meaning the one derived
+        from its old path, the id is rewritten to match the new path. A note
+        without an ``id``, or with a custom one, is moved unchanged.
 
         Unless ``update_links`` is False, wiki links to the note are rewritten
         in every visible note of the vault, including the moved note itself.
