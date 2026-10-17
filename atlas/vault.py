@@ -481,7 +481,13 @@ class Vault:
                 path. It is also what ``{{id}}`` becomes in a template.
 
         Raises:
-            ...
+            InvalidTemplateNameError: If the template name is not valid.
+            TemplateNotFoundError: If the template does not exist.
+            FileReadError: If the template cannot be read.
+            InvalidFrontmatterError: If the template's frontmatter is not valid.
+            NoteExistsError: If the note already exists.
+            FileCreationError: If the note or its parent folders cannot be
+                created.
         """
         path: Path = self.path_of(note)
         resolved_id: str = note_id if note_id is not None else note.note_id
