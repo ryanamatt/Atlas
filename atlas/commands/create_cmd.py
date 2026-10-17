@@ -3,10 +3,10 @@
 """The ``atlas create`` command."""
 
 import argparse
-from typing import TYPE_CHECKING
 import os
 import shlex
 import subprocess
+from typing import TYPE_CHECKING
 
 from atlas.commands._types import SubParsers, non_empty
 from atlas.vault import Vault
@@ -54,7 +54,7 @@ def register(subparsers: SubParsers) -> None:
     parser.add_argument(
         "--open",
         action="store_true",
-        help="Open the note (or last note) in the users $EDITOR. Does not open if no $EDITOR."
+        help="Open the note (or last note) in the users $EDITOR. Does not open if no $EDITOR.",
     )
 
     parser.set_defaults(handler=run)
@@ -98,11 +98,11 @@ def run(args: argparse.Namespace) -> int:
             print("Created Note:", new_note.path)
 
     if args.open and last_note is not None:
-        editor: str | None = os.environ.get('EDITOR', None)
+        editor: str | None = os.environ.get("EDITOR", None)
         if editor:
             try:
-                cmd = shlex.split(editor) + [str(last_note.path)]
-                subprocess.call(cmd)
+                cmd: list[str] = [*shlex.split(editor), str(last_note.path)]
+                subprocess.call(cmd)  # noqa: S603
             except FileNotFoundError:
                 print(f"Editor '{editor}' not found.")
                 return 0
