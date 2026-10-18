@@ -22,8 +22,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/you/atlas"
-Issues = "https://github.com/you/atlas/issues"
+Homepage = "https://github.com/ryanamatt/Atlas/tree/master"
+Issues = "https://github.com/ryanamatt/Atlas/tree/master/issues"
 
 [project.scripts]
 atlas = "atlas.main:main"
