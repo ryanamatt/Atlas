@@ -461,6 +461,7 @@ class Vault:
         properties: Mapping[str, Any] | None = None,
         template: str | None = None,
         note_id: str | None = None,
+        body: str | None = None,
     ) -> None:
         """
         Creates the note file, along with any missing parent folders.
@@ -479,6 +480,10 @@ class Vault:
                 without the ``.md`` suffix.
             note_id: An id to use instead of the one derived from the note's
                 path. It is also what ``{{id}}`` becomes in a template.
+            body: Text to use as the note body instead of the default heading or
+                the template body. A trailing newline is added if it is missing.
+                The text is written as given, so ``{{placeholders}}`` in it are not
+                rendered. The template's frontmatter is still applied.
 
         Raises:
             InvalidTemplateNameError: If the template name is not valid.
@@ -492,7 +497,7 @@ class Vault:
         path: Path = self.path_of(note)
         resolved_id: str = note_id if note_id is not None else note.note_id
         data: dict[str, Any] = {"id": resolved_id}
-        body: str = f"# {note.title}\n"
+        note_body: str = f"# {note.title}\n"
 
         if template is not None:
             template_data, template_body = self.read_template(template)
@@ -503,7 +508,10 @@ class Vault:
             }
             rendered: dict[str, Any] = templates.render_data(template_data, values)
             data.update((key, value) for key, value in rendered.items() if key != "id")
-            body = templates.render(template_body, values)
+            note_body = templates.render(template_body, values)
+
+        if body is not None:
+            note_body = body if not body or body.endswith("\n") else f"{body}\n"
 
         data.update((key, value) for key, value in (properties or {}).items() if key != "id")
 
@@ -514,7 +522,7 @@ class Vault:
 
         try:
             with path.open("x", encoding="utf-8") as file:
-                file.write(frontmatter.join(data, body))
+                file.write(frontmatter.join(data, note_body))
         except FileExistsError as error:
             raise NoteExistsError(note.path) from error
         except OSError as error:

@@ -6,11 +6,13 @@ import argparse
 import os
 import shlex
 import subprocess
+import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from atlas import frontmatter
 from atlas.commands._types import SubParsers, non_empty
-from atlas.errors import InvalidNoteIdError
+from atlas.errors import FileReadError, InvalidNoteIdError
 from atlas.vault import Vault
 
 if TYPE_CHECKING:
@@ -72,6 +74,17 @@ def register(subparsers: SubParsers) -> None:
     )
 
     parser.add_argument(
+        "-b",
+        "--body",
+        metavar="TEXT",
+        help=(
+            "Seed the note body with this text instead of the default heading or the "
+            "template body. Use '-' to read the body from standard input. When creating "
+            "several notes, every note gets the same body."
+        ),
+    )
+
+    parser.add_argument(
         "-t",
         "--template",
         type=non_empty,
@@ -86,6 +99,23 @@ def register(subparsers: SubParsers) -> None:
     )
 
     parser.set_defaults(handler=run)
+
+
+def _read_stdin() -> str:
+    """
+    Reads all of standard input as text.
+
+    Returns:
+        The text that was piped in.
+
+    Raises:
+        FileReadError: If standard input cannot be read or is not valid text.
+    """
+    try:
+        return sys.stdin.read()
+    except (OSError, UnicodeDecodeError) as error:
+        reason: str = getattr(error, "strerror", None) or str(error)
+        raise FileReadError(Path("<stdin>"), reason) from error
 
 
 def run(args: argparse.Namespace) -> int:
@@ -124,11 +154,21 @@ def run(args: argparse.Namespace) -> int:
         key, value = frontmatter.parse_property(assignment)
         properties[key] = value
 
+    body: str | None = args.body
+    if body == "-":
+        body = _read_stdin()
+
     last_note: Note | None = None
 
     for name in args.names:
         new_note: Note = vault.resolve_note(name)
-        vault.create(new_note, properties=properties, template=args.template, note_id=args.note_id)
+        vault.create(
+            new_note,
+            properties=properties,
+            template=args.template,
+            note_id=args.note_id,
+            body=body,
+        )
         last_note = new_note
 
         if not args.quiet:
