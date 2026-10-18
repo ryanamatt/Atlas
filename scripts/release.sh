@@ -3,7 +3,7 @@
 
 # Releases an Atlas version
 
-python -m build
+pipx run build
 
 twin check dist/*
 
