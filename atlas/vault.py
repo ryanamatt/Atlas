@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
@@ -26,6 +27,7 @@ from atlas.errors import (
     InvalidTemplateNameError,
     NoteExistsError,
     NoteNotFoundError,
+    NoteNotInTrashError,
     TemplateNotFoundError,
     VaultAlreadyInitializedError,
     VaultNotFoundError,
@@ -36,6 +38,8 @@ from atlas.note import MARKDOWN_SUFFIX, Note
 ATLAS_DIRNAME: str = ".atlas"
 CONFIG_FILENAME: str = "config.toml"
 TRASH_DIRNAME: str = ".trash"
+TRASH_STAMP_FORMAT: str = "%Y%m%d-%H%M%S"
+_TRASH_STAMP_PATTERN: str = r"\d{8}-\d{6}"  # Matches TRASH_STAMP_FORMAT.
 TEMPLATE_DIRNAME: str = "templates"
 
 DEFAULT_CONFIG: str = """\
@@ -547,7 +551,7 @@ class Vault:
             raise NoteNotFoundError(note.path)
 
         trash_dir: Path = self.ensure_trash_exists()
-        stamp: str = datetime.now().strftime("%Y%m%d-%H%M%S")
+        stamp: str = datetime.now().strftime(TRASH_STAMP_FORMAT)
         destination: Path = (
             trash_dir / note.path.parent / f"{note.path.stem}.{stamp}{note.path.suffix}"
         )
@@ -558,6 +562,120 @@ class Vault:
         except (OSError, shutil.Error) as error:
             reason = getattr(error, "strerror", None) or str(error)
             raise FileDeletionError(self.path_of(note), reason) from error
+
+    def latest_trashed(self, note: Note) -> Path | None:
+        """
+        Finds the most recent trashed copy of a note.
+
+        Deleting a note adds a timestamp to its name, so a note that was
+        deleted several times has several copies in the trash. This looks for
+        copies in the same trash folder that the note would have been moved to.
+
+        Args:
+            note: The note, by its original path in the vault.
+
+        Returns:
+            The absolute path of the newest trashed copy, or None if the note
+            is not in the trash.
+
+        Raises:
+            DirectoryReadError: If the trash folder cannot be read.
+        """
+        folder: Path = self.trash_dir / note.path.parent
+        pattern: re.Pattern[str] = re.compile(
+            rf"{re.escape(note.path.stem)}\.(?P<stamp>{_TRASH_STAMP_PATTERN})"
+            rf"{re.escape(note.path.suffix)}"
+        )
+
+        try:
+            if not folder.is_dir():
+                return None
+            copies: list[tuple[str, Path]] = [
+                (found["stamp"], entry)
+                for entry in folder.iterdir()
+                if entry.is_file() and (found := pattern.fullmatch(entry.name))
+            ]
+        except OSError as error:
+            raise DirectoryReadError(folder, error.strerror) from error
+
+        if not copies:
+            return None
+        return max(copies, key=lambda copy: copy[0])[1]
+
+    def find_restorable(self, note: Note) -> Path:
+        """
+        Checks that a note can be restored and finds the copy to restore.
+
+        Args:
+            note: The note, by its original path in the vault.
+
+        Returns:
+            The absolute path of the trashed copy that would be restored.
+
+        Raises:
+            NoteNotInTrashError: If the note is not in the trash.
+            NoteExistsError: If something already exists at the note's path.
+            DirectoryReadError: If the trash folder cannot be read.
+        """
+        trashed: Path | None = self.latest_trashed(note)
+        if trashed is None:
+            raise NoteNotInTrashError(note.path)
+        if self.path_of(note).exists():
+            raise NoteExistsError(note.path)
+        return trashed
+
+    def restore(self, note: Note) -> None:
+        """
+        Moves a deleted note out of the trash and back to its original path.
+
+        The timestamp that deletion added to the name is removed. If the note
+        was deleted several times, the most recent copy is restored. Missing
+        parent folders are created, and trash folders left empty are removed.
+        The note is moved as it is: its id and links were not touched by
+        deleting it, so there is nothing to put back.
+
+        Args:
+            note: The note, by its original path in the vault.
+
+        Raises:
+            NoteNotInTrashError: If the note is not in the trash.
+            NoteExistsError: If something already exists at the note's path.
+            DirectoryReadError: If the trash folder cannot be read.
+            FileCreationError: If parent folders cannot be created.
+            FileWriteError: If the note cannot be moved out of the trash.
+        """
+        trashed: Path = self.find_restorable(note)
+        destination: Path = self.path_of(note)
+
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise FileCreationError(destination.parent, error.strerror) from error
+
+        try:
+            shutil.move(trashed, destination)
+        except (OSError, shutil.Error) as error:
+            reason = getattr(error, "strerror", None) or str(error)
+            raise FileWriteError(destination, reason) from error
+
+        self._prune_trash(trashed.parent)
+
+    def _prune_trash(self, folder: Path) -> None:
+        """
+        Removes empty folders from the trash, from a folder up to the trash.
+
+        The trash directory itself is kept. This stops at the first folder
+        that is not empty or cannot be removed.
+
+        Args:
+            folder: The trash folder to start from.
+        """
+        while folder != self.trash_dir and folder.is_relative_to(self.trash_dir):
+            try:
+                folder.rmdir()
+            except OSError:
+                return
+            folder = folder.parent
 
     def move(self, source: Note, destination: Note, update_links: bool = True) -> MoveResult:
         """
