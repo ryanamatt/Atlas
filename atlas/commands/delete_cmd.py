@@ -4,7 +4,9 @@
 
 import argparse
 
+from atlas.commands._output import emit
 from atlas.commands._types import SubParsers
+from atlas.note import Note
 from atlas.vault import Vault
 
 
@@ -50,6 +52,13 @@ def run(args: argparse.Namespace) -> int:
     """
     vault: Vault = Vault.open(args.vault)
 
+    deleted: list[str] = []
     for name in args.names:
-        vault.delete(vault.resolve_note(name))
+        note: Note = vault.resolve_note(name)
+        vault.delete(note)
+        deleted.append(note.path.as_posix())
+
+    if args.json_output:
+        emit({"deleted": deleted})
+
     return 0

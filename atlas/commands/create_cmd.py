@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from atlas import frontmatter
+from atlas.commands._output import emit
 from atlas.commands._types import SubParsers, non_empty
 from atlas.errors import FileReadError, InvalidNoteIdError
 from atlas.vault import Vault
@@ -159,6 +160,7 @@ def run(args: argparse.Namespace) -> int:
         body = _read_stdin()
 
     last_note: Note | None = None
+    created: list[dict[str, str]] = []
 
     for name in args.names:
         new_note: Note = vault.resolve_note(name)
@@ -170,9 +172,18 @@ def run(args: argparse.Namespace) -> int:
             body=body,
         )
         last_note = new_note
+        created.append(
+            {
+                "path": new_note.path.as_posix(),
+                "id": args.note_id if args.note_id is not None else new_note.note_id,
+            }
+        )
 
-        if not args.quiet:
+        if not args.quiet and not args.json_output:
             print("Created Note:", new_note.path)
+
+    if args.json_output:
+        emit({"created": created})
 
     if args.open and last_note is not None:
         editor: str | None = os.environ.get("EDITOR", None)
@@ -181,7 +192,10 @@ def run(args: argparse.Namespace) -> int:
                 cmd: list[str] = [*shlex.split(editor), str(last_note.path)]
                 subprocess.call(cmd)  # noqa: S603
             except FileNotFoundError:
-                print(f"Editor '{editor}' not found.")
+                print(
+                    f"Editor '{editor}' not found.",
+                    file=sys.stderr if args.json_output else sys.stdout,
+                )
                 return 0
 
     return 0

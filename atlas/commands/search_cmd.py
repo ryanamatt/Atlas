@@ -4,6 +4,7 @@
 
 import argparse
 
+from atlas.commands._output import emit
 from atlas.commands._types import SubParsers
 from atlas.note import Note
 from atlas.vault import Vault
@@ -79,6 +80,10 @@ def run(args: argparse.Namespace) -> int:
         ),
         key=lambda path: (path.casefold(), path),
     )
+
+    if args.json_output:
+        emit({"query": query, "results": results})
+        return 0
 
     for path in results:
         print(path)
