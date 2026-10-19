@@ -4,6 +4,7 @@
 
 import argparse
 
+from atlas.commands._output import emit
 from atlas.commands._types import SubParsers
 from atlas.vault import Vault
 
@@ -38,5 +39,10 @@ def run(args: argparse.Namespace) -> int:
         FileCreationError: If the ``.atlas`` directory or its config file
             cannot be created.
     """
-    Vault(args.vault).initialize()
+    vault: Vault = Vault(args.vault)
+    vault.initialize()
+
+    if args.json_output:
+        emit({"vault": str(vault.root)})
+
     return 0

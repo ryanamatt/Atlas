@@ -5,6 +5,7 @@
 import argparse
 from typing import TYPE_CHECKING
 
+from atlas.commands._output import emit
 from atlas.commands._types import SubParsers
 from atlas.errors import (
     DuplicateDestinationError,
@@ -134,10 +135,22 @@ def run(args: argparse.Namespace) -> int:
 
     links_updated: int = 0
     notes_updated: int = 0
+    moved: list[dict[str, str]] = []
     for source, target in pairs:
         result: MoveResult = vault.move(source, target, update_links=args.update_links)
         links_updated += result.links_updated
         notes_updated += result.notes_updated
+        moved.append({"from": source.path.as_posix(), "to": target.path.as_posix()})
+
+    if args.json_output:
+        emit(
+            {
+                "moved": moved,
+                "links_updated": links_updated,
+                "notes_updated": notes_updated,
+            }
+        )
+        return 0
 
     if links_updated:
         links: str = "link" if links_updated == 1 else "links"
