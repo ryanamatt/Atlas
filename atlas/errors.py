@@ -101,6 +101,19 @@ class NoteNotFoundError(AtlasError):
         super().__init__(f"Note does not exist: {path}")
 
 
+class NoteNotInTrashError(AtlasError):
+    """
+    Raised when a note that must be restored is not in the trash.
+
+    Attributes:
+        path: The original path of the note, relative to the vault root.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path: Path = path
+        super().__init__(f"Note is not in the trash: {path}")
+
+
 class FileDeletionError(AtlasError):
     """
     Raised when a file cannot be deleted.
