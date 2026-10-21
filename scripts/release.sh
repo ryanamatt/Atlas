@@ -3,8 +3,12 @@
 
 # Releases an Atlas version
 
-pipx run build
+set -euo pipefail
 
-twin check dist/*
+# Build the package using uv's build tool execution
+uvx build
 
-twine upload dist/*
+# Check and upload using twine via uvx
+uvx twine check dist/*
+
+uvx twine upload dist/*
