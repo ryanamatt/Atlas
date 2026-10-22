@@ -93,6 +93,9 @@ def run(args: argparse.Namespace) -> int:
         vault.delete(note)
         deleted.append(note.path.as_posix())
 
+        if not args.quiet and not args.json_output:
+            print("Deleted Note:", note.path)
+
     if args.json_output:
         emit({"deleted": deleted})
 
