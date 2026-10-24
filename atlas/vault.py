@@ -49,7 +49,7 @@ DEFAULT_CONFIG: str = """\
 schema_version = 1
 """
 
-DEFAULT_TEMPLATE: str = "---\nid: \"{{id}}\"\n---\n\n# {{title}}\n\n"
+DEFAULT_TEMPLATE: str = '---\nid: "{{id}}"\n---\n\n# {{title}}\n\n'
 
 MAX_PARENT_SEARCH: int = 5
 

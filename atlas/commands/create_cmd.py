@@ -3,9 +3,6 @@
 """The ``atlas create`` command."""
 
 import argparse
-import os
-import shlex
-import subprocess
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -187,6 +184,6 @@ def run(args: argparse.Namespace) -> int:
         emit({"created": created})
 
     if args.open and last_note is not None:
-        open_in_editor(last_note.path, args.json_output) 
+        open_in_editor(last_note.path, args.json_output)
 
     return 0
