@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from atlas import frontmatter
+from atlas.commands._editor import open_in_editor
 from atlas.commands._output import emit
 from atlas.commands._types import SubParsers, non_empty
 from atlas.errors import FileReadError, InvalidNoteIdError
@@ -186,16 +187,6 @@ def run(args: argparse.Namespace) -> int:
         emit({"created": created})
 
     if args.open and last_note is not None:
-        editor: str | None = os.environ.get("EDITOR", None)
-        if editor:
-            try:
-                cmd: list[str] = [*shlex.split(editor), str(last_note.path)]
-                subprocess.call(cmd)  # noqa: S603
-            except FileNotFoundError:
-                print(
-                    f"Editor '{editor}' not found.",
-                    file=sys.stderr if args.json_output else sys.stdout,
-                )
-                return 0
+        open_in_editor(last_note.path, args.json_output) 
 
     return 0
