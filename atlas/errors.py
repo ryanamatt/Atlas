@@ -291,6 +291,19 @@ class InvalidTemplateNameError(AtlasError):
         super().__init__(f"Invalid template name {name!r}: {reason}")
 
 
+class TemplateExistsError(AtlasError):
+    """
+    Raised when creating a template whose file already exists.
+
+    Attributes:
+        path: The path of the existing template, relative to the vault root.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path: Path = path
+        super().__init__(f"Template already exists: {path}")
+
+
 class TemplateNotFoundError(AtlasError):
     """
     Raised when a template cannot be found.
