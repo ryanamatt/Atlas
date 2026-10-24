@@ -29,8 +29,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ryanamatt/Atlas/tree/master"
-Issues = "https://github.com/ryanamatt/Atlas/tree/master/issues"
+Homepage = "https://github.com/ryanamatt/Atlas"
+Issues = "https://github.com/ryanamatt/Atlas/issues"
 
 [project.scripts]
 atlas = "atlas.main:main"
