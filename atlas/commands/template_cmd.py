@@ -5,8 +5,9 @@
 import argparse
 from pathlib import Path
 
+from atlas.commands._editor import open_in_editor
 from atlas.commands._output import emit
-from atlas.commands._types import SubParsers
+from atlas.commands._types import SubParsers, non_empty
 from atlas.errors import DirectoryReadError
 from atlas.vault import Vault
 
@@ -30,6 +31,19 @@ def register(subparsers: SubParsers) -> None:
 
     list_parser = template_subparsers.add_parser("list", help="List all available templates.")
     list_parser.set_defaults(handler=run_list)
+
+    create_parser = template_subparsers.add_parser("create", help="Create a new template.")
+    create_parser.add_argument(
+        "name",
+        type=non_empty,
+        help="Name of the new template, e.g. 'Nation'. The '.md' extension is optional.",
+    )
+    create_parser.add_argument(
+        "--open",
+        action="store_true",
+        help="Open the new template in the users $EDITOR. Does not open if no $EDITOR.",
+    )
+    create_parser.set_defaults(handler=run_create)
 
 
 def _read_templates(templates_dir: Path) -> list[Path]:
@@ -85,5 +99,39 @@ def run_list(args: argparse.Namespace) -> int:
 
     for item in templates:
         print(item.name)
+
+    return 0
+
+
+def run_create(args: argparse.Namespace) -> int:
+    """
+    Runs the ``template create`` command.
+
+    Args:
+        args: The parsed command-line arguments.
+
+    Returns:
+        The process exit code. Zero indicates success.
+
+    Raises:
+        VaultNotFoundError: If the vault path does not exist.
+        VaultNotInitializedError: If the vault has no ``.atlas`` directory.
+        InvalidTemplateNameError: If the template name is not valid.
+        TemplateExistsError: If the template already exists.
+        FileCreationError: If the template or the templates directory cannot
+            be created.
+    """
+    vault: Vault = Vault.open(args.vault)
+
+    path: Path = vault.create_template(args.name)
+    relative: Path = path.relative_to(vault.root)
+
+    if args.json_output:
+        emit({"created": {"name": path.stem, "path": relative.as_posix()}})
+    elif not args.quiet:
+        print("Created Template:", relative)
+
+    if args.open:
+        open_in_editor(path, args.json_output)
 
     return 0

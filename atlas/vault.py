@@ -28,6 +28,7 @@ from atlas.errors import (
     NoteExistsError,
     NoteNotFoundError,
     NoteNotInTrashError,
+    TemplateExistsError,
     TemplateNotFoundError,
     VaultAlreadyInitializedError,
     VaultNotFoundError,
@@ -47,6 +48,8 @@ DEFAULT_CONFIG: str = """\
  
 schema_version = 1
 """
+
+DEFAULT_TEMPLATE: str = "---\nid: \"{{id}}\"\n---\n\n# {{title}}\n\n"
 
 MAX_PARENT_SEARCH: int = 5
 
@@ -231,6 +234,46 @@ class Vault:
             raise FileCreationError(self.trash_dir, error.strerror) from error
         return self.trash_dir
 
+    @staticmethod
+    def _bare_template_name(name: str) -> str:
+        """
+        Validates a template name and removes an optional ``.md`` suffix.
+
+        Args:
+            name: The template name, such as ``Nation`` or ``Nation.md``.
+
+        Returns:
+            The name without its suffix.
+
+        Raises:
+            InvalidTemplateNameError: If the name is empty or contains a path
+                separator or ``..``.
+        """
+        bare: str = name[: -len(MARKDOWN_SUFFIX)] if Note.is_note_name(name) else name
+        if not bare.strip() or "/" in bare or "\\" in bare or ".." in bare:
+            raise InvalidTemplateNameError(name, "must not be empty or contain '/', '\\', or '..'")
+        return bare
+
+    def _find_template(self, bare: str) -> Path | None:
+        """
+        Finds a template file by name, ignoring letter case.
+
+        Args:
+            bare: The template name without the ``.md`` suffix.
+
+        Returns:
+            The absolute path of the template, or None if there is none.
+        """
+        target: str = f"{bare}{MARKDOWN_SUFFIX}".casefold()
+        return next(
+            (
+                candidate
+                for candidate in self.templates_dir.glob(f"*{MARKDOWN_SUFFIX}")
+                if candidate.name.casefold() == target and candidate.is_file()
+            ),
+            None,
+        )
+
     def read_template(self, name: str) -> tuple[dict[str, Any], str]:
         """
         Reads and parses a template by name from the templates directory.
@@ -251,19 +294,8 @@ class Vault:
             FileReadError: If the file cannot be read.
             InvalidFrontmatterError: If the frontmatter is malformed.
         """
-        bare: str = name[: -len(MARKDOWN_SUFFIX)] if Note.is_note_name(name) else name
-        if not bare.strip() or "/" in bare or "\\" in bare or ".." in bare:
-            raise InvalidTemplateNameError(name, "must not be empty or contain '/', '\\', or '..'")
-
-        target: str = f"{bare}{MARKDOWN_SUFFIX}".casefold()
-        template_path: Path | None = next(
-            (
-                candidate
-                for candidate in self.templates_dir.glob(f"*{MARKDOWN_SUFFIX}")
-                if candidate.name.casefold() == target and candidate.is_file()
-            ),
-            None,
-        )
+        bare: str = self._bare_template_name(name)
+        template_path: Path | None = self._find_template(bare)
         if template_path is None:
             raise TemplateNotFoundError(
                 Path(ATLAS_DIRNAME, TEMPLATE_DIRNAME, f"{bare}{MARKDOWN_SUFFIX}")
@@ -283,6 +315,52 @@ class Vault:
             ) from error
 
         return data, body
+
+    def create_template(self, name: str) -> Path:
+        """
+        Creates a new template file, and the templates directory if needed.
+
+        The template starts with a single ``# {{title}}`` heading and no
+        frontmatter. The name is checked case-insensitively against existing
+        templates, so ``nation`` is refused when ``Nation.md`` exists, because
+        ``read_template`` could not tell them apart.
+
+        Args:
+            name: The template name, such as ``Nation``. The ``.md`` suffix is
+                optional.
+
+        Returns:
+            The absolute path of the new template.
+
+        Raises:
+            InvalidTemplateNameError: If the name is empty or contains a path
+                separator or ``..``.
+            TemplateExistsError: If a template with that name already exists.
+            FileCreationError: If the template or the templates directory
+                cannot be created.
+        """
+        bare: str = self._bare_template_name(name)
+
+        existing: Path | None = self._find_template(bare)
+        if existing is not None:
+            raise TemplateExistsError(Path(ATLAS_DIRNAME, TEMPLATE_DIRNAME, existing.name))
+
+        path: Path = self.templates_dir / f"{bare}{MARKDOWN_SUFFIX}"
+
+        try:
+            self.templates_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise FileCreationError(self.templates_dir, error.strerror) from error
+
+        try:
+            with path.open("x", encoding="utf-8") as file:
+                file.write(DEFAULT_TEMPLATE)
+        except FileExistsError as error:
+            raise TemplateExistsError(path.relative_to(self.root)) from error
+        except OSError as error:
+            raise FileCreationError(path, error.strerror) from error
+
+        return path
 
     # ------------------------------------------------------------------
     # Notes
