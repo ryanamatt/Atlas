@@ -6,7 +6,7 @@ import json
 from typing import Any
 
 
-def emit(data: Any) -> None:
+def emit(data: Any) -> None:  # noqa: ANN401
     """
     Prints one JSON document to standard output.
 

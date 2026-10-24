@@ -3,7 +3,10 @@
 """The ``atlas delete`` command."""
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from atlas.commands._output import emit
 from atlas.commands._types import SubParsers
