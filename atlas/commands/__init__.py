@@ -10,6 +10,7 @@ from atlas.commands import (
     move_cmd,
     restore_cmd,
     search_cmd,
+    template_cmd,
 )
 from atlas.commands._types import SubParsers
 
@@ -28,3 +29,4 @@ def register_all(subparsers: SubParsers) -> None:
     restore_cmd.register(subparsers)
     move_cmd.register(subparsers)
     search_cmd.register(subparsers)
+    template_cmd.register(subparsers)
