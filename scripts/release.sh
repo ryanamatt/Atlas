@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Build the package using uv's build tool execution
-uvx build
+uvx --from build pyproject-build
 
 # Check and upload using twine via uvx
 uvx twine check dist/*
