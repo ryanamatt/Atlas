@@ -3,6 +3,7 @@
 """The ``atlas list`` command."""
 
 import argparse
+import re
 from pathlib import Path
 from typing import Any
 
@@ -34,11 +35,19 @@ def register(subparsers: SubParsers) -> None:
         action="store_true",
         help="List hidden files and files in hidden directories.",
     )
+    parser.add_argument(
+        "-e",
+        "--exclude",
+        type=str,
+        help="Patterns to exclude, seperated by pipes (e.g. '.git|.venv')",
+    )
 
     parser.set_defaults(handler=run)
 
 
-def is_listed(item: Path, ignore_hidden: bool) -> bool:
+def is_listed(
+    item: Path, ignore_hidden: bool, exclude_pattern: re.Pattern[str] | None = None
+) -> bool:
     """
     Decides whether a directory entry belongs in the tree.
 
@@ -48,11 +57,14 @@ def is_listed(item: Path, ignore_hidden: bool) -> bool:
     Args:
         item: The directory entry to check.
         ignore_hidden: Whether entries whose name starts with ``.`` are skipped.
+        exclude_pattern: Optional compiled regex pattern to exclude entries.
 
     Returns:
         True if the entry should appear in the tree.
     """
     if ignore_hidden and item.name.startswith("."):
+        return False
+    if exclude_pattern and exclude_pattern.search(item.name):
         return False
     if item.is_dir():
         return True
@@ -74,13 +86,16 @@ def sort_key(item: Path) -> tuple[bool, str, str]:
     return (not item.is_dir(), item.name.lower(), item.name)
 
 
-def _read_entries(path: Path, ignore_hidden: bool) -> list[Path]:
+def _read_entries(
+    path: Path, ignore_hidden: bool, exclude_pattern: re.Pattern[str] | None = None
+) -> list[Path]:
     """
     Reads the listed entries of one directory in display order.
 
     Args:
         path: The directory to read.
         ignore_hidden: Whether entries whose name starts with ``.`` are skipped.
+        exclude_pattern: Optional compiled regex pattern to exclude entries.
 
     Returns:
         The entries that belong in the tree, sorted with ``sort_key``.
@@ -90,14 +105,19 @@ def _read_entries(path: Path, ignore_hidden: bool) -> list[Path]:
     """
     try:
         return sorted(
-            (item for item in path.iterdir() if is_listed(item, ignore_hidden)),
+            (item for item in path.iterdir() if is_listed(item, ignore_hidden, exclude_pattern)),
             key=sort_key,
         )
     except OSError as error:
         raise DirectoryReadError(path, error.strerror) from error
 
 
-def build_tree(path: Path, prefix: str = "", ignore_hidden: bool = True) -> list[str]:
+def build_tree(
+    path: Path,
+    prefix: str = "",
+    ignore_hidden: bool = True,
+    exclude_pattern: re.Pattern[str] | None = None,
+) -> list[str]:
     """
     Builds the lines of a visual tree for a directory.
 
@@ -110,6 +130,7 @@ def build_tree(path: Path, prefix: str = "", ignore_hidden: bool = True) -> list
         path: The directory to list.
         prefix: The prefix string used for formatting tree branches.
         ignore_hidden: Whether to ignore hidden files and directories (starting with '.').
+        exclude_pattern: Optional compiled regex pattern to exclude entries.
 
     Returns:
         The tree, one line per entry.
@@ -117,7 +138,7 @@ def build_tree(path: Path, prefix: str = "", ignore_hidden: bool = True) -> list
     Raises:
         DirectoryReadError: If a directory cannot be read.
     """
-    items: list[Path] = _read_entries(path, ignore_hidden)
+    items: list[Path] = _read_entries(path, ignore_hidden, exclude_pattern)
 
     lines: list[str] = []
     last_index: int = len(items) - 1
@@ -128,12 +149,17 @@ def build_tree(path: Path, prefix: str = "", ignore_hidden: bool = True) -> list
 
         if item.is_dir() and not item.is_symlink():
             extension: str = BLANK if is_last else PIPE
-            lines.extend(build_tree(item, prefix + extension, ignore_hidden))
+            lines.extend(build_tree(item, prefix + extension, ignore_hidden, exclude_pattern))
 
     return lines
 
 
-def build_tree_data(path: Path, root: Path, ignore_hidden: bool = True) -> list[dict[str, Any]]:
+def build_tree_data(
+    path: Path,
+    root: Path,
+    ignore_hidden: bool = True,
+    exclude_pattern: re.Pattern[str] | None = None,
+) -> list[dict[str, Any]]:
     """
     Builds the same tree as ``build_tree``, as data for ``--json``.
 
@@ -146,6 +172,7 @@ def build_tree_data(path: Path, root: Path, ignore_hidden: bool = True) -> list[
         path: The directory to list.
         root: The vault root, which entry paths are relative to.
         ignore_hidden: Whether to ignore hidden files and directories (starting with '.').
+        exclude_pattern: Optional compiled regex pattern to exclude entries.
 
     Returns:
         The entries of the directory, in the same order as ``build_tree``.
@@ -155,7 +182,7 @@ def build_tree_data(path: Path, root: Path, ignore_hidden: bool = True) -> list[
     """
     entries: list[dict[str, Any]] = []
 
-    for item in _read_entries(path, ignore_hidden):
+    for item in _read_entries(path, ignore_hidden, exclude_pattern):
         entry: dict[str, Any] = {
             "name": item.name,
             "path": item.relative_to(root).as_posix(),
@@ -163,7 +190,7 @@ def build_tree_data(path: Path, root: Path, ignore_hidden: bool = True) -> list[
         }
         if item.is_dir():
             entry["children"] = (
-                [] if item.is_symlink() else build_tree_data(item, root, ignore_hidden)
+                [] if item.is_symlink() else build_tree_data(item, root, ignore_hidden, exclude_pattern)
             )
         entries.append(entry)
 
@@ -188,17 +215,21 @@ def run(args: argparse.Namespace) -> int:
     vault: Vault = Vault.open(args.vault)
 
     ignore_hidden: bool = not args.all
+    exclude_pattern: re.Pattern[str] | None = (
+        re.compile(args.exclude) if args.exclude else None
+    )
 
     if args.json_output:
         emit(
             {
                 "root": str(vault.root),
-                "entries": build_tree_data(vault.root, vault.root, ignore_hidden),
+                "entries": build_tree_data(vault.root, vault.root, ignore_hidden, exclude_pattern),
             }
         )
         return 0
 
-    for line in build_tree(vault.root, ignore_hidden=ignore_hidden):
+    for line in build_tree(vault.root, ignore_hidden=ignore_hidden, exclude_pattern=exclude_pattern):
         print(line)
 
     return 0
+
