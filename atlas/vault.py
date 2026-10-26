@@ -362,6 +362,60 @@ class Vault:
 
         return path
 
+    def resolve_template(self, name: str) -> Path:
+        """
+        Finds an existing template by name.
+
+        The name is matched case-insensitively, and an optional ``.md`` suffix
+        is ignored, as in ``read_template``.
+
+        Args:
+            name: The template name, such as ``Nation``.
+
+        Returns:
+            The absolute path of the template.
+
+        Raises:
+            InvalidTemplateNameError: If the name is empty or contains a path
+                separator or ``..``.
+            TemplateNotFoundError: If the template file does not exist.
+        """
+        bare: str = self._bare_template_name(name)
+        path: Path | None = self._find_template(bare)
+        if path is None:
+            raise TemplateNotFoundError(
+                Path(ATLAS_DIRNAME, TEMPLATE_DIRNAME, f"{bare}{MARKDOWN_SUFFIX}")
+            )
+        return path
+
+    def delete_template(self, path: Path) -> None:
+        """
+        Moves a template into the vault's trash directory.
+
+        The template keeps its relative path inside the trash, under3
+        ``.atlas/templates``, and a timestamp is added to its name so repeated
+        deletions never collide. Use ``resolve_template`` to get the path.
+
+        Args:
+            path: The absolute path of the template, as returned by
+                ``resolve_template``.
+
+        Raises:
+            FileCreationError: If the trash directory cannot be created.
+            FileDeletionError: If the template cannot be moved to the trash.
+        """
+        trash_dir: Path = self.ensure_trash_exists()
+        stamp: str = datetime.now().strftime(TRASH_STAMP_FORMAT)
+        relative: Path = path.relative_to(self.root)
+        destination: Path = trash_dir / relative.parent / f"{path.stem}.{stamp}{path.suffix}"
+
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(path, destination)
+        except (OSError, shutil.Error) as error:
+            reason = getattr(error, "strerror", None) or str(error)
+            raise FileDeletionError(path, reason) from error
+
     # ------------------------------------------------------------------
     # Notes
     # ------------------------------------------------------------------

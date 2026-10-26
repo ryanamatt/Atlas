@@ -8,7 +8,7 @@ from pathlib import Path
 from atlas.commands._editor import open_in_editor
 from atlas.commands._output import emit
 from atlas.commands._types import SubParsers, non_empty
-from atlas.errors import DirectoryReadError
+from atlas.errors import DirectoryReadError, DuplicateDestinationError
 from atlas.vault import Vault
 
 
@@ -44,6 +44,18 @@ def register(subparsers: SubParsers) -> None:
         help="Open the new template in the users $EDITOR. Does not open if no $EDITOR.",
     )
     create_parser.set_defaults(handler=run_create)
+
+    delete_parser = template_subparsers.add_parser("delete", help="Delete a template.")
+    delete_parser.add_argument(
+        "names",
+        nargs="+",
+        type=non_empty,
+        help=(
+            "Name(s) of the template(s) to delete, e.g. 'Nation'. "
+            "The '.md' extension is optional."
+        ),
+    )
+    delete_parser.set_defaults(handler=run_delete)
 
 
 def _read_templates(templates_dir: Path) -> list[Path]:
@@ -133,5 +145,73 @@ def run_create(args: argparse.Namespace) -> int:
 
     if args.open:
         open_in_editor(path, args.json_output)
+
+    return 0
+
+
+def _plan_deletes(vault: Vault, names: list[str]) -> list[Path]:
+    """
+    Resolves every template name and checks all of them up front.
+
+    Nothing is deleted until every template has passed, so a bad argument
+    never leaves some templates in the trash and others not.
+
+    Args:
+        vault: The vault the templates belong to.
+        names: The template names as typed.
+
+    Returns:
+        The absolute paths of the templates to delete, in the order given.
+
+    Raises:
+        InvalidTemplateNameError: If a name is not valid.
+        TemplateNotFoundError: If a template does not exist.
+        DuplicateDestinationError: If the same template is named more than
+            once, for example as ``Nation`` and ``nation.md``.
+    """
+    paths: list[Path] = [vault.resolve_template(name) for name in names]
+
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen:
+            raise DuplicateDestinationError(path.relative_to(vault.root))
+        seen.add(path)
+
+    return paths
+
+
+def run_delete(args: argparse.Namespace) -> int:
+    """
+    Runs the ``template delete`` command.
+
+    Args:
+        args: The parsed command-line arguments.
+
+    Returns:
+        The process exit code. Zero indicates success.
+
+    Raises:
+        VaultNotFoundError: If the vault path does not exist.
+        VaultNotInitializedError: If the vault has no ``.atlas`` directory.
+        InvalidTemplateNameError: If a template name is not valid.
+        TemplateNotFoundError: If a template does not exist.
+        DuplicateDestinationError: If the same template is named more than once.
+        FileCreationError: If the trash directory cannot be created.
+        FileDeletionError: If a template cannot be moved to the trash.
+    """
+    vault: Vault = Vault.open(args.vault)
+    paths: list[Path] = _plan_deletes(vault, args.names)
+
+    deleted: list[dict[str, str]] = []
+    for path in paths:
+        vault.delete_template(path)
+        relative: Path = path.relative_to(vault.root)
+        deleted.append({"name": path.stem, "path": relative.as_posix()})
+
+        if not args.quiet and not args.json_output:
+            print("Deleted Template:", relative)
+
+    if args.json_output:
+        emit({"deleted": deleted})
 
     return 0
